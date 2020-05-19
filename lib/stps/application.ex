@@ -9,6 +9,7 @@ defmodule Stps.Application do
     children = [
       # Starts a worker by calling: Stps.Worker.start_link(arg)
       # {Stps.Worker, arg}
+      Stps.Worker
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
