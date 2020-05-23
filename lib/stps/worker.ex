@@ -3,7 +3,7 @@ defmodule Stps.Worker do
 
   @one_minute 60 * 1000
   @query Application.get_env(:stps, :twitter_query)
-  @last_created_at Application.get_env(:stps, :twitter_last_created_at)
+  @init_last_created_at Application.get_env(:stps, :twitter_last_created_at)
   @incoming_webhook_url Application.get_env(:stps, :slack_incoming_webhook_url)
   @channel Application.get_env(:stps, :slack_channel)
 
@@ -13,15 +13,17 @@ defmodule Stps.Worker do
 
   def init(_state) do
     Process.send_after(__MODULE__, :tick, @one_minute)
-    {:ok, %{last_created_at: @last_created_at}}
+    table = table()
+    {:ok, %{last_created_at: last_created_at(table), table: table}}
   end
 
-  def handle_info(:tick, %{last_created_at: last_created_at}) do
+  def handle_info(:tick, %{last_created_at: last_created_at, table: table}) do
     Process.send_after(__MODULE__, :tick, @one_minute)
 
     new_last_created_at = run(last_created_at)
+    :dets.insert(table, last_created_at: new_last_created_at)
 
-    {:noreply, %{last_created_at: new_last_created_at}}
+    {:noreply, %{last_created_at: new_last_created_at, table: table}}
   end
 
   def handle_call(:current_state, _from, current_state),
@@ -108,5 +110,17 @@ defmodule Stps.Worker do
 
     headers = [{"Content-type", "application/json"}]
     HTTPoison.post!(@incoming_webhook_url, body, headers)
+  end
+
+  defp last_created_at(table) do
+    case :dets.lookup(table, :last_created_at) |> Enum.at(0) do
+      nil -> @init_last_created_at
+      {:last_created_at, last_created_at} -> last_created_at
+    end
+  end
+
+  defp table do
+    {:ok, table} = :dets.open_file(:disk_storage, type: :set)
+    table
   end
 end
