@@ -6,6 +6,7 @@ defmodule Stps.Worker do
   @init_last_created_at Application.get_env(:stps, :twitter_last_created_at)
   @incoming_webhook_url Application.get_env(:stps, :slack_incoming_webhook_url)
   @channel Application.get_env(:stps, :slack_channel)
+  @ignores Application.get_env(:stps, :ignores) |> String.split(",")
 
   def start_link(state \\ %{}) do
     GenServer.start_link(__MODULE__, state, name: __MODULE__)
@@ -88,6 +89,7 @@ defmodule Stps.Worker do
         url: "https://twitter.com/#{screen_name}/status/#{id_str}"
       }
     end)
+    |> Enum.reject(fn %{screen_name: screen_name} -> screen_name in @ignores end)
     |> Enum.filter(fn %{created_at: created_at} -> created_at > last_created_at end)
   end
 
